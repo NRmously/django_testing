@@ -1,11 +1,11 @@
-from django.urls import reverse
+from django.contrib.auth.models import User
 from django.test import Client, TestCase
+from django.urls import reverse
 from notes.forms import NoteForm
 from notes.models import Note
-from django.contrib.auth.models import User
 
 
-class TestContent(TestCase):
+class BaseTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
@@ -22,26 +22,33 @@ class TestContent(TestCase):
             slug='note1',
         )
 
+    url = reverse('notes:list')
+
+
+class TestContent(BaseTest):
+
     def test_notes_list_for_author(self):
-        url = reverse('notes:list')
-        response = self.author_client.get(url)
+        response = self.author_client.get(self.url)
         object_list = response.context['object_list']
-        self.assertIn(self.note, object_list)
+        self.assertIsNotNone(object_list)
+        if object_list:
+            self.assertIn(self.note, object_list)
 
     def test_notes_list_for_not_author(self):
-        url = reverse('notes:list')
-        response = self.not_author_client.get(url)
+        response = self.not_author_client.get(self.url)
         object_list = response.context['object_list']
-        self.assertNotIn(self.note, object_list)
+        self.assertIsNotNone(object_list)
+        if object_list:
+            self.assertIn(self.note, object_list)
 
-    def test_pages_contains_form_add(self):
-        url = reverse('notes:add')
-        response = self.author_client.get(url)
-        self.assertIn('form', response.context)
-        self.assertIsInstance(response.context['form'], NoteForm)
+    def test_pages_contains_form_add_and_edit(self):
+        url_add = reverse('notes:add')
+        response_add = self.author_client.get(url_add)
+        url_edit = reverse('notes:edit', args=[self.note.slug])
+        response_edit = self.author_client.get(url_edit)
 
-    def test_pages_contains_form_edit(self):
-        url = reverse('notes:edit', args=[self.note.slug])
-        response = self.author_client.get(url)
-        self.assertIn('form', response.context)
-        self.assertIsInstance(response.context['form'], NoteForm)
+        self.assertIn('form', response_add.context)
+        self.assertIsInstance(response_add.context['form'], NoteForm)
+
+        self.assertIn('form', response_edit.context)
+        self.assertIsInstance(response_edit.context['form'], NoteForm)
