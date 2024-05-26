@@ -1,19 +1,16 @@
 from http import HTTPStatus
 import pytest
+
 from django.urls import reverse
 
 
 @pytest.mark.django_db
-def test_pages_availability(client, setup_data):
-    urls = (
-        ('news:home', None),
-        ('news:detail', (setup_data['news'].id,)),
-        ('users:login', None),
-        ('users:logout', None),
-        ('users:signup', None),
-    )
-    for name, args in urls:
-        url = reverse(name, args=args if args else None)
+def test_pages_availability(client, setup_data, reverse_urls):
+    for name, url_name in reverse_urls.items():
+        if name == 'detail':
+            url = reverse(url_name, args=(setup_data['news'].pk,))
+        else:
+            url = reverse(url_name)
         response = client.get(url)
         assert response.status_code == HTTPStatus.OK
 
