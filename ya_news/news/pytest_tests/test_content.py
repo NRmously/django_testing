@@ -25,7 +25,7 @@ def test_news_order(client, setup_homepage_data, home_url):
 
 
 @pytest.mark.django_db
-def test_comments_order(client, setup_detail_page_data):
+def test_order_comments(client, setup_detail_page_data):
     response = client.get(setup_detail_page_data['detail_url'])
     assert 'news' in response.context
     news = response.context['news']
