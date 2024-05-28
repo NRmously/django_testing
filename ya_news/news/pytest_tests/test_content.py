@@ -3,8 +3,8 @@ from datetime import date
 from django.conf import settings
 from django.utils import timezone
 import pytest
-from news.forms import CommentForm
 
+from news.forms import CommentForm
 from .conftest import url_reverse
 
 pytestmark = pytest.mark.django_db

@@ -2,9 +2,9 @@ from http import HTTPStatus
 
 from django.contrib.auth import get_user_model
 from pytils.translit import slugify
+
 from notes.forms import WARNING
 from notes.models import Note
-
 from .core import BaseTest
 
 User = get_user_model()

@@ -2,9 +2,9 @@ from http import HTTPStatus
 
 import pytest
 from pytest_django.asserts import assertFormError, assertRedirects
+
 from news.forms import BAD_WORDS, WARNING
 from news.models import Comment
-
 from .conftest import url_reverse
 
 pytestmark = pytest.mark.django_db

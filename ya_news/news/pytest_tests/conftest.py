@@ -5,6 +5,7 @@ from django.test.client import Client
 from django.urls import reverse
 from django.utils import timezone
 import pytest
+
 from news.models import Comment, News
 
 
