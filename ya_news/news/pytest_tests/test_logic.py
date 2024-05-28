@@ -1,104 +1,84 @@
 from http import HTTPStatus
+
 import pytest
-from pytest_django.asserts import assertRedirects
-
-from django.urls import reverse
-
+from pytest_django.asserts import assertFormError, assertRedirects
 from news.forms import BAD_WORDS, WARNING
 from news.models import Comment
 
+from .conftest import url_reverse
 
-@pytest.mark.django_db
-def test_anonym_user_cant_create_comment(client, setup_comment_creation_data):
-    response = client.post(
-        setup_comment_creation_data['url'],
-        data=setup_comment_creation_data['form_data']
-    )
-    login_url = reverse('users:login')
-    expected_url = f'{login_url}?next={setup_comment_creation_data["url"]}'
-    assert response.status_code == HTTPStatus.FOUND
-    assertRedirects(response, expected_url)
+pytestmark = pytest.mark.django_db
+
+
+def test_anonymous_user_cant_create_comment(client, news, form_data):
+    expected_count = Comment.objects.count()
+    client.post(url_reverse.get('detail'), data=form_data)
     comments_count = Comment.objects.count()
-    assert comments_count == 0
+    assert expected_count == comments_count
 
 
-@pytest.mark.django_db
-def test_user_can_create_comment(setup_comment_creation_data):
-    response = setup_comment_creation_data['auth_client'].post(
-        setup_comment_creation_data['url'],
-        data=setup_comment_creation_data['form_data']
-    )
-    assert response.status_code == HTTPStatus.FOUND
-    assert response.url == f"{setup_comment_creation_data['url']}#comments"
+def test_user_can_create_comment(author_client, author, news, form_data):
+    expected_count = Comment.objects.count() + 1
+    response = author_client.post(url_reverse.get('detail'), data=form_data)
     comments_count = Comment.objects.count()
-    assert comments_count == 1
-    comment = Comment.objects.get()
-    assert comment.text == setup_comment_creation_data['form_data']['text']
-    assert comment.news == setup_comment_creation_data['news']
-    assert comment.author == setup_comment_creation_data['user']
+    new_comment = Comment.objects.get()
+    assertRedirects(response, f"{url_reverse.get('detail')}#comments")
+    assert expected_count == comments_count
+    assert new_comment.text == form_data['text']
+    assert new_comment.author == author
+    assert new_comment.news == news
 
 
-@pytest.mark.django_db
-def test_user_cant_use_bad_words(setup_comment_creation_data):
-    bad_words_data = {
-        'text': f'Какой-то текст, {", ".join(BAD_WORDS)}, еще текст'
-    }
-    response = setup_comment_creation_data['auth_client'].post(
-        setup_comment_creation_data['url'],
+@pytest.mark.parametrize('word', BAD_WORDS)
+def test_user_cant_use_bad_words(author_client, news, word):
+    expected_count = Comment.objects.count()
+    bad_words_data = {'text': f'Какой-то текст, {word}, еще текст'}
+    response = author_client.post(
+        url_reverse.get('detail'),
         data=bad_words_data
     )
-    assert response.status_code == HTTPStatus.OK
-    assert 'form' in response.context
-    assert WARNING in response.context['form'].errors['text']
     comments_count = Comment.objects.count()
-    assert comments_count == 0
+    assertFormError(response, form='form', field='text', errors=WARNING)
+    assert expected_count == comments_count
 
 
-@pytest.mark.django_db
-def test_author_can_delete_comment(setup_comment_edit_delete_data):
-    response = setup_comment_edit_delete_data['author_client'].delete(
-        setup_comment_edit_delete_data['delete_url']
-    )
-    assert response.status_code == HTTPStatus.FOUND
-    assert response.url == setup_comment_edit_delete_data['url_to_comments']
+def test_author_can_delete_comment(author_client, comment, pk_news):
+    expected_count = Comment.objects.count() - 1
+    response = author_client.delete(url_reverse.get('delete'))
     comments_count = Comment.objects.count()
-    assert comments_count == 0
+    assertRedirects(response, f"{url_reverse.get('detail')}#comments")
+    assert expected_count == comments_count
 
 
-@pytest.mark.django_db
-def test_user_cant_delete_foreign_comment(setup_comment_edit_delete_data):
-    response = setup_comment_edit_delete_data['reader_client'].delete(
-        setup_comment_edit_delete_data['delete_url']
-    )
+def test_user_cant_delete_foreign_comment(not_author_client, comment):
+    expected_count = Comment.objects.count()
+    response = not_author_client.delete(url_reverse.get('delete'))
+    comments_count = Comment.objects.count()
     assert response.status_code == HTTPStatus.NOT_FOUND
+    assert expected_count == comments_count
+
+
+def test_author_can_edit_comment(
+    author, author_client, comment, pk_news, form_data
+):
+    expected_count = Comment.objects.count()
+    response = author_client.post(url_reverse.get('edit'), data=form_data)
+    assertRedirects(response, f"{url_reverse.get('detail')}#comments")
+    comment.refresh_from_db()
     comments_count = Comment.objects.count()
-    assert comments_count == 1
+    assert expected_count == comments_count
+    assert comment.text == 'Новый текст комментария'
+    assert comment.author == author
 
 
-@pytest.mark.django_db
-def test_author_can_edit_comment(setup_comment_edit_delete_data):
-    response = setup_comment_edit_delete_data['author_client'].post(
-        setup_comment_edit_delete_data['edit_url'],
-        data=setup_comment_edit_delete_data['form_data']
-    )
-    expected_url = setup_comment_edit_delete_data['url_to_comments']
-    assert response.status_code == HTTPStatus.FOUND
-    assertRedirects(response, expected_url)
-    assert setup_comment_edit_delete_data['comment'] is not None
-    setup_comment_edit_delete_data['comment'].refresh_from_db()
-    assert setup_comment_edit_delete_data['comment'].text == (
-        setup_comment_edit_delete_data['form_data']['text']
-    )
-
-
-@pytest.mark.django_db
-def test_user_cant_edit_foreign_comment(setup_comment_edit_delete_data):
-    response = setup_comment_edit_delete_data['reader_client'].post(
-        setup_comment_edit_delete_data['edit_url'],
-        data=setup_comment_edit_delete_data['form_data']
-    )
+def test_user_cant_edit_foreign_comment(
+    author, not_author_client, comment, pk_news, form_data
+):
+    expected_count = Comment.objects.count()
+    response = not_author_client.post(url_reverse.get('edit'), data=form_data)
+    comment.refresh_from_db()
+    comments_count = Comment.objects.count()
     assert response.status_code == HTTPStatus.NOT_FOUND
-    assert setup_comment_edit_delete_data['comment'] is not None
-    setup_comment_edit_delete_data['comment'].refresh_from_db()
-    text_of_comment = setup_comment_edit_delete_data['comment'].text
-    assert text_of_comment == 'Текст комментария'
+    assert expected_count == comments_count
+    assert comment.text == 'Текст комментария'
+    assert comment.author == author

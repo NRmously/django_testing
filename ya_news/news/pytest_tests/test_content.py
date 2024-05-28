@@ -1,49 +1,42 @@
-import pytest
+from datetime import date
 
 from django.conf import settings
-
+from django.utils import timezone
+import pytest
 from news.forms import CommentForm
 
+from .conftest import url_reverse
 
-@pytest.mark.django_db
-def test_news_count(client, setup_homepage_data, home_url):
-    response = client.get(home_url)
+pytestmark = pytest.mark.django_db
+
+
+def test_news_count_and_order(client, news_list):
+    response = client.get(url_reverse.get('home'))
     assert 'object_list' in response.context
-    object_list = response.context['object_list']
-    news_count = object_list.count()
-    assert news_count == settings.NEWS_COUNT_ON_HOME_PAGE
+    object_list = list(response.context['object_list'])
+    assert len(object_list) == settings.NEWS_COUNT_ON_HOME_PAGE
+    assert isinstance(object_list[0].date, date)
+    assert object_list == sorted(
+        object_list, key=lambda x: x.date, reverse=True
+    )
 
 
-@pytest.mark.django_db
-def test_news_order(client, setup_homepage_data, home_url):
-    response = client.get(home_url)
-    assert 'object_list' in response.context
-    object_list = response.context['object_list']
-    all_dates = [news.date for news in object_list]
-    sorted_dates = sorted(all_dates, reverse=True)
-    assert all_dates == sorted_dates
-
-
-@pytest.mark.django_db
-def test_order_comments(client, setup_detail_page_data):
-    response = client.get(setup_detail_page_data['detail_url'])
+def test_order_comments(client, news, author_comments):
+    response = client.get(url_reverse.get('detail'))
     assert 'news' in response.context
     news = response.context['news']
-    all_comments = news.comment_set.all()
-    all_timestamps = [comment.created for comment in all_comments]
-    sorted_timestamps = sorted(all_timestamps)
-    assert all_timestamps == sorted_timestamps
+    all_comments = list(news.comment_set.all())
+    assert isinstance(all_comments[0].created, timezone.datetime)
+    sorted_comments = sorted(all_comments, key=lambda x: x.created)
+    assert all_comments == sorted_comments
 
 
-@pytest.mark.django_db
-def test_anonymous_client_has_no_form(client, setup_detail_page_data):
-    response = client.get(setup_detail_page_data['detail_url'])
+def test_anonymous_client_has_no_form(client):
+    response = client.get(url_reverse.get('detail'))
     assert 'form' not in response.context
 
 
-@pytest.mark.django_db
-def test_authorized_client_has_form(client, setup_detail_page_data):
-    client.force_login(setup_detail_page_data['author'])
-    response = client.get(setup_detail_page_data['detail_url'])
+def test_authorized_client_has_form(author_client, news):
+    response = author_client.get(url_reverse.get('detail'))
     assert 'form' in response.context
     assert isinstance(response.context['form'], CommentForm)

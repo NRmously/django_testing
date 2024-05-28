@@ -1,4 +1,5 @@
 from notes.forms import NoteForm
+
 from .core import BaseTest
 
 
