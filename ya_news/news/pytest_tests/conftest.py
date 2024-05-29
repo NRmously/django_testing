@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
+import random
 
 from django.conf import settings
 from django.test.client import Client
@@ -8,6 +9,8 @@ import pytest
 
 from news.models import Comment, News
 
+
+FORM_DATA = {'text': 'Новый текст комментария'}
 
 url_reverse = {
     'home': reverse('news:home'),
@@ -56,14 +59,19 @@ def pk_news(news):
 
 @pytest.fixture
 def news_list():
-    news_list = News.objects.bulk_create(
-        News(
-            title=f'Заголовок {i}',
-            text='Текст новости',
-            date=datetime.today().date() - timedelta(days=i),
+    news_objects = []
+    for i in range(settings.NEWS_COUNT_ON_HOME_PAGE + 1):
+        random_offset = timedelta(
+            days=random.randint(0, settings.NEWS_COUNT_ON_HOME_PAGE + 1)
         )
-        for i in range(settings.NEWS_COUNT_ON_HOME_PAGE + 1)
-    )
+        news_objects.append(
+            News(
+                title=f'Заголовок {i}',
+                text='Текст новости',
+                date=timezone.now().date() - random_offset,
+            )
+        )
+    news_list = News.objects.bulk_create(news_objects)
     return news_list
 
 
@@ -85,13 +93,7 @@ def author_comments(author, news):
             author=author,
             text=f'Комментарий {i}',
         )
-        comment.created = timezone.now() + timedelta(days=i)
+        random_offset = timedelta(days=random.randint(0, 3))
+        comment.created = timezone.now() - random_offset
         comment.save()
     return author_comments
-
-
-@pytest.fixture
-def form_data():
-    return {
-        'text': 'Новый текст комментария',
-    }

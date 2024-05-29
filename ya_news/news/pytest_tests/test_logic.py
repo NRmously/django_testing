@@ -5,26 +5,26 @@ from pytest_django.asserts import assertFormError, assertRedirects
 
 from news.forms import BAD_WORDS, WARNING
 from news.models import Comment
-from .conftest import url_reverse
+from .conftest import url_reverse, FORM_DATA
 
 pytestmark = pytest.mark.django_db
 
 
-def test_anonymous_user_cant_create_comment(client, news, form_data):
+def test_anonymous_user_cant_create_comment(client, news):
     expected_count = Comment.objects.count()
-    client.post(url_reverse.get('detail'), data=form_data)
+    client.post(url_reverse.get('detail'), data=FORM_DATA)
     comments_count = Comment.objects.count()
     assert expected_count == comments_count
 
 
-def test_user_can_create_comment(author_client, author, news, form_data):
+def test_user_can_create_comment(author_client, author, news):
     expected_count = Comment.objects.count() + 1
-    response = author_client.post(url_reverse.get('detail'), data=form_data)
+    response = author_client.post(url_reverse.get('detail'), data=FORM_DATA)
     comments_count = Comment.objects.count()
     new_comment = Comment.objects.get()
     assertRedirects(response, f"{url_reverse.get('detail')}#comments")
     assert expected_count == comments_count
-    assert new_comment.text == form_data['text']
+    assert new_comment.text == FORM_DATA['text']
     assert new_comment.author == author
     assert new_comment.news == news
 
@@ -58,11 +58,9 @@ def test_user_cant_delete_foreign_comment(not_author_client, comment):
     assert expected_count == comments_count
 
 
-def test_author_can_edit_comment(
-    author, author_client, comment, pk_news, form_data
-):
+def test_author_can_edit_comment(author, author_client, comment, pk_news):
     expected_count = Comment.objects.count()
-    response = author_client.post(url_reverse.get('edit'), data=form_data)
+    response = author_client.post(url_reverse.get('edit'), data=FORM_DATA)
     assertRedirects(response, f"{url_reverse.get('detail')}#comments")
     comment.refresh_from_db()
     comments_count = Comment.objects.count()
@@ -72,10 +70,10 @@ def test_author_can_edit_comment(
 
 
 def test_user_cant_edit_foreign_comment(
-    author, not_author_client, comment, pk_news, form_data
+    author, not_author_client, comment, pk_news
 ):
     expected_count = Comment.objects.count()
-    response = not_author_client.post(url_reverse.get('edit'), data=form_data)
+    response = not_author_client.post(url_reverse.get('edit'), data=FORM_DATA)
     comment.refresh_from_db()
     comments_count = Comment.objects.count()
     assert response.status_code == HTTPStatus.NOT_FOUND

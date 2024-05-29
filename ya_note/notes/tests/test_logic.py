@@ -20,7 +20,12 @@ class NoteTests(BaseTest):
         )
         self.assertRedirects(response, self.url_names['success'])
         self.assertEqual(Note.objects.count(), posts_count + 1)
+        note_exists = Note.objects.filter(slug=self.form_data['slug']).exists()
+        self.assertTrue(note_exists)
         new_note = Note.objects.get(slug=self.form_data['slug'])
+        self.assertEqual(new_note.title, self.form_data['title'])
+        self.assertEqual(new_note.text, self.form_data['text'])
+        self.assertEqual(new_note.slug, self.form_data['slug'])
         self.assertEqual(new_note.author, self.author)
 
     def test_anonymous_user_cant_create_note(self):
@@ -58,6 +63,8 @@ class NoteTests(BaseTest):
         self.assertRedirects(response, self.url_names['success'])
         self.assertEqual(Note.objects.count(), (posts_count + 1))
         expected_slug = slugify(self.form_data['title'])
+        note_exists = Note.objects.filter(slug=expected_slug).exists()
+        self.assertTrue(note_exists)
         new_note = Note.objects.get(slug=expected_slug)
         self.assertEqual(new_note.slug, expected_slug)
 
